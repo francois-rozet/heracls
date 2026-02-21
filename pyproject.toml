@@ -1,0 +1,57 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = ["setuptools>=61.0"]
+
+[project]
+name = "heracls"
+description = "Slayer of Hydra"
+authors = [
+  {name = "François Rozet", email = "francois.rozet@outlook.com"}
+]
+classifiers = [
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Natural Language :: English",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "dacite>=1.9.2",
+    "omegaconf>=2.3.0",
+]
+dynamic = ["version"]
+keywords = ["config", "dataclass"]
+readme = "README.md"
+requires-python = ">=3.8"
+
+[project.optional-dependencies]
+dev = [
+    "ruff==0.15.2",
+]
+
+[project.urls]
+documentation = "https://github.com/francois-rozet/heracls"
+source = "https://github.com/francois-rozet/heracls"
+tracker = "https://github.com/francois-rozet/heracls/issues"
+
+[tool.ruff]
+line-length = 99
+
+[tool.ruff.lint]
+extend-select = ["B", "I", "W"]
+preview = true
+
+[tool.ruff.lint.isort]
+lines-between-types = 1
+relative-imports-order = "closest-to-furthest"
+section-order = ["future", "third-party", "first-party", "local-folder"]
+
+[tool.ruff.format]
+preview = true
+
+[tool.setuptools.dynamic]
+version = {attr = "heracls.__version__"}
+
+[tool.setuptools.packages.find]
+include = ["heracls*"]

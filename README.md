@@ -1,2 +1,1 @@
-# heracls
-Slayer of Hydra
+# Heracls - Slayer of Hydra
