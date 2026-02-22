@@ -9,6 +9,7 @@ from heracls import ArgumentParser, choice, from_yaml, to_yaml
 def test_pipeline():
     @dataclass
     class ModelConfig:
+        name: str = "mlp"
         depth: int = 3
         width: int = 256
 

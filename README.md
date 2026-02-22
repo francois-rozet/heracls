@@ -28,6 +28,7 @@ from typing import Literal, Tuple, Union
 
 @dataclass
 class ModelConfig:
+    name: str = "mlp"
     depth: int = 3
     width: int = 256
 
@@ -71,6 +72,8 @@ def main():
 
     trainset, validset, testset = load_dataset(args.train.data_splits)
 
+    model = init_model(args.train.model)
+
     for epoch in range(args.train.n_epochs):
         ...
 
@@ -81,6 +84,7 @@ if __name__ == "__main__":
 ```
 $ python train.py --dry --depth 5 --optimizer sgd --data_splits 0.7 0.2
 model:
+  name: mlp
   depth: 5
   width: 256
 optimizer:
@@ -97,11 +101,11 @@ n_steps_per_epoch: 256
 ```
 
 ```
-$ python train.yaml --help
+$ python train.py --help
 usage: train.py [-h] [--dry] [--optimizer {adam,sgd}] [--dataset str]
                 [--data_splits float float] [--n_epochs int] [--n_steps_per_epoch int]
-                [--depth int] [--width int] [--name {adam}] [--betas float float]
-                [--learning_rate float] [--weight_decay float]
+                [--model.name str] [--depth int] [--width int] [--optimizer.name {adam}]
+                [--betas float float] [--learning_rate float] [--weight_decay float]
 
 options:
   -h, --help                 show this help message and exit
@@ -117,15 +121,16 @@ TrainConfig ['train']:
   --n_steps_per_epoch int    (default: 256)
 
 ModelConfig ['train.model']:
-  ModelConfig(depth: int = 3, width: int = 256)
+  ModelConfig(name: str = 'mlp', depth: int = 3, width: int = 256)
 
+  --model.name str           (default: mlp)
   --depth int                (default: 3)
   --width int                (default: 256)
 
 AdamConfig ['train.optimizer']:
   AdamConfig(name: Literal['adam'] = 'adam', betas: Tuple[float, float] = (0.95, 0.95), learning_rate: float = 0.001, weight_decay: float = 0.0)
 
-  --name {adam}              (default: adam)
+  --optimizer.name {adam}    (default: adam)
   --betas float float        (default: (0.95, 0.95))
   --learning_rate float      (default: 0.001)
   --weight_decay float       (default: 0.0)
