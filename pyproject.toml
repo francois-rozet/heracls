@@ -18,6 +18,7 @@ classifiers = [
 dependencies = [
     "dacite>=1.9.2",
     "omegaconf>=2.3.0",
+    "simple-parsing>=0.1.7",
 ]
 dynamic = ["version"]
 keywords = ["config", "dataclass"]
@@ -41,7 +42,7 @@ line-length = 99
 
 [tool.ruff.lint]
 extend-select = ["B", "I", "W"]
-ignore = ["FA100"]
+ignore = ["FA100", "RUF009"]
 preview = true
 
 [tool.ruff.lint.isort]

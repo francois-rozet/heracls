@@ -2,8 +2,9 @@
 
 __version__ = "0.1.0"
 
-from . import patch, transforms  # noqa: F401
-from .transforms import (  # noqa: F401
+from . import cli, core, patch  # noqa: F401
+from .cli import ArgumentParser, choice  # noqa: F401
+from .core import (  # noqa: F401
     from_dict,
     from_dotlist,
     from_omega,

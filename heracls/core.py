@@ -1,4 +1,4 @@
-"""Data transformations."""
+"""Core data transformations."""
 
 __all__ = [
     "from_dict",
@@ -11,20 +11,22 @@ __all__ = [
 ]
 
 import dacite
+import yaml
 
 from dataclasses import fields as iter_fields
 from dataclasses import is_dataclass
 from omegaconf import DictConfig, OmegaConf
 from typing import Any, ClassVar, Dict, List, Protocol, Type, TypeVar
 
-T = TypeVar("T")
 
-
-class DataClass(Protocol):
+class Dataclass(Protocol):
     __dataclass_fields__: ClassVar[Dict[str, Any]]
 
 
-def from_dict(data_cls: Type[T], data: Dict[str, Any]) -> T:
+DC = TypeVar("DC", bound=Dataclass)
+
+
+def from_dict(data_cls: Type[DC], data: Dict[str, Any]) -> DC:
     """Instantiate a dataclass from a dictionary.
 
     Arguments:
@@ -45,7 +47,7 @@ def from_dict(data_cls: Type[T], data: Dict[str, Any]) -> T:
     )
 
 
-def to_dict(data: DataClass, /, recursive: bool = False) -> Dict[str, Any]:
+def to_dict(data: Dataclass, /, recursive: bool = False) -> Dict[str, Any]:
     """Convert a dataclass instance to a dictionary.
 
     Arguments:
@@ -64,7 +66,7 @@ def to_dict(data: DataClass, /, recursive: bool = False) -> Dict[str, Any]:
     return data
 
 
-def from_omega(data_cls: Type[T], data: DictConfig) -> T:
+def from_omega(data_cls: Type[DC], data: DictConfig) -> DC:
     """Instantiate a dataclass from an :mod:`omegaconf` config.
 
     Arguments:
@@ -80,7 +82,7 @@ def from_omega(data_cls: Type[T], data: DictConfig) -> T:
     )
 
 
-def to_omega(data: DataClass) -> DictConfig:
+def to_omega(data: Dataclass) -> DictConfig:
     """Convert a dataclass instance to an :mod:`omegaconf` config.
 
     Arguments:
@@ -92,7 +94,7 @@ def to_omega(data: DataClass) -> DictConfig:
     return OmegaConf.create(to_dict(data, recursive=True))
 
 
-def from_yaml(data_cls: Type[T], data: str) -> T:
+def from_yaml(data_cls: Type[DC], data: str) -> DC:
     """Instantiate a dataclass from a YAML string.
 
     Arguments:
@@ -102,23 +104,24 @@ def from_yaml(data_cls: Type[T], data: str) -> T:
     Returns:
         A `data_cls` instance.
     """
-    return from_omega(data_cls, OmegaConf.create(data))
+    return from_dict(data_cls, yaml.safe_load(data))
 
 
-def to_yaml(data: DataClass, sort_keys: bool = False) -> str:
-    """Serialize a dataclass instance to YAML.
+def to_yaml(data: Dataclass, **kwargs) -> str:
+    """Serialize a dataclass instance to a YAML string.
 
     Arguments:
         data: A dataclass instance.
-        sort_keys: Sort mapping keys in YAML output when `True`.
+        kwargs: Keyword arguments passed to :func:`yaml.safe_dump`.
 
     Returns:
         A YAML string representation of `data`.
     """
-    return OmegaConf.to_yaml(to_omega(data), sort_keys=sort_keys)
+    kwargs.setdefault("sort_keys", False)
+    return yaml.safe_dump(to_dict(data, recursive=True), **kwargs)
 
 
-def from_dotlist(data_cls: Type[T], data: List[str]) -> T:
+def from_dotlist(data_cls: Type[DC], data: List[str]) -> DC:
     """Instantiate a dataclass from a list of dot-style strings.
 
     Arguments:
