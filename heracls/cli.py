@@ -14,7 +14,7 @@ T = TypeVar("T")
 ArgumentParser.__init__.__kwdefaults__["formatter_class"] = partial(
     SimpleHelpFormatter,
     max_help_position=64,
-    width=128,
+    width=96,
 )
 
 

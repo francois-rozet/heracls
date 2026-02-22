@@ -98,8 +98,9 @@ n_steps_per_epoch: 256
 
 ```
 $ python train.yaml --help
-usage: train.py [-h] [--dry] [--optimizer {adam,sgd}] [--dataset str] [--data_splits float float] [--n_epochs int]
-                [--n_steps_per_epoch int] [--depth int] [--width int] [--name {adam}] [--betas float float]
+usage: train.py [-h] [--dry] [--optimizer {adam,sgd}] [--dataset str]
+                [--data_splits float float] [--n_epochs int] [--n_steps_per_epoch int]
+                [--depth int] [--width int] [--name {adam}] [--betas float float]
                 [--learning_rate float] [--weight_decay float]
 
 options:
