@@ -14,7 +14,7 @@ import dacite
 import yaml
 
 from dataclasses import fields as iter_fields
-from dataclasses import is_dataclass
+from dataclasses import is_dataclass, asdict
 from omegaconf import DictConfig, OmegaConf
 from typing import Any, ClassVar, Dict, List, Protocol, Type, TypeVar
 
@@ -47,22 +47,22 @@ def from_dict(data_cls: Type[DC], data: Dict[str, Any]) -> DC:
     )
 
 
-def to_dict(data: Dataclass, /, recursive: bool = False) -> Dict[str, Any]:
+def to_dict(data: Dataclass, *, recursive: bool = True) -> Dict[str, Any]:
     """Convert a dataclass instance to a dictionary.
 
     Arguments:
         data: A dataclass instance.
-        recursive: Recursively convert nested dataclasses when `True`.
+        recursive: Recurse into nested dataclasses, dicts, lists, and tuples when `True`.
 
     Returns:
         A dictionary representation of `data`.
     """
     if not is_dataclass(type(data)):
         return data
+    elif recursive:
+        return asdict(data)
     keys = [f.name for f in iter_fields(data)]
     data = {k: getattr(data, k) for k in keys}
-    if recursive:
-        data = {k: to_dict(v, recursive=True) for k, v in data.items()}
     return data
 
 
