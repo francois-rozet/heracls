@@ -27,7 +27,7 @@ from unittest.mock import patch
 from .core import from_dict
 from .typing import Dataclass
 
-T = TypeVar("T")
+T = TypeVar("T", bound=type)
 DC = TypeVar("DC", bound=Dataclass)
 HELP = "<HELP>"
 
@@ -46,17 +46,16 @@ class DataclassSpec:
     root: bool
 
 
+def origin(t: T) -> T:
+    return t if get_origin(t) is None else get_origin(t)
+
+
 def boolean(s: str) -> bool:
     return s.lower() in {"1", "true", "yes", "on"}
 
 
 def dict_parser(t: T) -> Callable[[str], T]:
-    types = get_args(t)
-    types = types if types else (str, str)
-
-    key_parser, value_parser = any_parser(types[0]), any_parser(types[1])
-
-    return lambda s: {key_parser(k): value_parser(v) for k, v in json.loads(s).items()}
+    return lambda s: json.loads(s)
 
 
 def tuple_parser(t: T) -> Callable[[str], T]:
@@ -71,19 +70,29 @@ def tuple_parser(t: T) -> Callable[[str], T]:
         return lambda s: tuple(parser(x) for parser, x in zip(parsers, s.split(), strict=True))
 
 
+def list_parser(t: T) -> Callable[[str], T]:
+    types = get_args(t)
+    types = types if types else (str,)
+
+    parser = any_parser(types[0])
+    return lambda s: [parser(x) for x in s.split()]
+
+
 def any_parser(t: T) -> Callable[[str], T]:
-    if issubclass(t, bool):
+    if origin(t) in (int, float, str):
+        return origin(t)
+    if origin(t) is bool:
         return boolean
-    elif issubclass(t, (int, float, str)):
-        return t
-    elif issubclass(t, dict):
+    elif origin(t) is dict:
         parser = dict_parser(t)
-    elif issubclass(t, tuple):
+    elif origin(t) is tuple:
         parser = tuple_parser(t)
+    elif origin(t) is list:
+        parser = list_parser(t)
     else:
         return str
 
-    parser.__name__ = t.__name__
+    parser.__name__ = origin(t).__name__
 
     return parser
 
@@ -202,10 +211,10 @@ class ArgumentParser(argparse.ArgumentParser):
 
                 kwargs = {"dest": f_key, "default": default, "help": HELP}
 
-                if get_origin(f.type) == Literal:
+                if origin(f.type) == Literal:
                     types = get_args(f.type)
                     group.add_argument(f_flag, choices=types, **kwargs)
-                elif f.type is tuple or get_origin(f.type) is tuple:
+                elif origin(f.type) is tuple:
                     types = get_args(f.type)
                     types = types if types else (str, Ellipsis)
 
@@ -217,12 +226,12 @@ class ArgumentParser(argparse.ArgumentParser):
                         )
                     else:
                         group.add_argument(f_flag, type=any_parser(f.type), **kwargs)
-                elif f.type is list or get_origin(f.type) is list:
+                elif origin(f.type) is list:
                     types = get_args(f.type)
                     types = types if types else (str,)
 
                     group.add_argument(f_flag, nargs="*", type=any_parser(types[0]), **kwargs)
-                elif f.type is dict or get_origin(f.type) is dict:
+                elif origin(f.type) is dict:
                     group.add_argument(f_flag, type=any_parser(f.type), **kwargs)
                 else:
                     group.add_argument(f_flag, type=any_parser(f.type), **kwargs)

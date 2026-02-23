@@ -40,10 +40,13 @@ def test_pipeline():
         n_epochs: int = 1024
         n_steps_per_epoch: int = 256
         tasks: list[str] = field(default_factory=list)
+        magic: dict[str, float] = field(default_factory=dict)
 
     parser = ArgumentParser()
     parser.add_argument("--dry", action="store_true", help="dry run")
     parser.add_arguments(TrainConfig, dest="train", root=True)
+
+    parser.print_help()
 
     args = parser.parse_args([
         "--model.depth",
@@ -53,12 +56,15 @@ def test_pipeline():
         "--data_splits",
         "0.7",
         "0.2",
+        "--magic",
+        r'{"p": 3, "i": 0.14}',
     ])
 
     assert args.train == TrainConfig(
         model=ModelConfig(depth=5),
         optimizer=SGDConfig(),
         data_splits=(0.7, 0.2),
+        magic={"p": 3, "i": 0.14},
     )
 
     dump = to_yaml(args.train)
