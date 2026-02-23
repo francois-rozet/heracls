@@ -18,13 +18,12 @@ classifiers = [
 dependencies = [
     "dacite>=1.9.2",
     "omegaconf>=2.3.0",
-    "simple-parsing>=0.1.7",
 ]
 dynamic = ["version"]
 keywords = ["config", "dataclass"]
 license = "MIT"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 
 [project.optional-dependencies]
 dev = [

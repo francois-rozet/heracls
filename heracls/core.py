@@ -13,20 +13,17 @@ __all__ = [
 import dacite
 import yaml
 
+from dataclasses import asdict, is_dataclass
 from dataclasses import fields as iter_fields
-from dataclasses import is_dataclass, asdict
 from omegaconf import DictConfig, OmegaConf
-from typing import Any, ClassVar, Dict, List, Protocol, Type, TypeVar
+from typing import Any, TypeVar
 
-
-class Dataclass(Protocol):
-    __dataclass_fields__: ClassVar[Dict[str, Any]]
-
+from .typing import Dataclass
 
 DC = TypeVar("DC", bound=Dataclass)
 
 
-def from_dict(data_cls: Type[DC], data: Dict[str, Any]) -> DC:
+def from_dict(data_cls: type[DC], data: dict[str, Any]) -> DC:
     """Instantiate a dataclass from a dictionary.
 
     Arguments:
@@ -47,7 +44,7 @@ def from_dict(data_cls: Type[DC], data: Dict[str, Any]) -> DC:
     )
 
 
-def to_dict(data: Dataclass, *, recursive: bool = True) -> Dict[str, Any]:
+def to_dict(data: Dataclass, *, recursive: bool = True) -> dict[str, Any]:
     """Convert a dataclass instance to a dictionary.
 
     Arguments:
@@ -66,7 +63,7 @@ def to_dict(data: Dataclass, *, recursive: bool = True) -> Dict[str, Any]:
     return data
 
 
-def from_omega(data_cls: Type[DC], data: DictConfig) -> DC:
+def from_omega(data_cls: type[DC], data: DictConfig) -> DC:
     """Instantiate a dataclass from an :mod:`omegaconf` config.
 
     Arguments:
@@ -94,7 +91,7 @@ def to_omega(data: Dataclass) -> DictConfig:
     return OmegaConf.create(to_dict(data, recursive=True))
 
 
-def from_yaml(data_cls: Type[DC], data: str) -> DC:
+def from_yaml(data_cls: type[DC], data: str) -> DC:
     """Instantiate a dataclass from a YAML string.
 
     Arguments:
@@ -121,7 +118,7 @@ def to_yaml(data: Dataclass, **kwargs) -> str:
     return yaml.safe_dump(to_dict(data, recursive=True), **kwargs)
 
 
-def from_dotlist(data_cls: Type[DC], data: List[str]) -> DC:
+def from_dotlist(data_cls: type[DC], data: list[str]) -> DC:
     """Instantiate a dataclass from a list of dot-style strings.
 
     Arguments:

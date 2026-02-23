@@ -18,13 +18,13 @@ pip install git+https://github.com/francois-rozet/heracls
 
 ## Getting started
 
-The following example demonstrates how to declare a nested dataclass config, instantiate it from command line arguments, serialize it to YAML, and use it in a script. The `heracls.ArgumentParser` is a thin wrapper around [simple-parsing](https://github.com/lebrice/SimpleParsing), which populates the parser arguments from the config structure and types.
+The following example demonstrates how to declare a nested dataclass config, instantiate it from command line arguments, serialize it to YAML, and use it in a script. The `heracls.ArgumentParser` parser infers arguments from the dataclass structure and types.
 
 ```python
-import heracls
-
 from dataclasses import dataclass, field
-from typing import Literal, Tuple, Union
+from typing import Literal, Union
+
+import heracls
 
 @dataclass
 class ModelConfig:
@@ -35,7 +35,7 @@ class ModelConfig:
 @dataclass
 class AdamConfig:
     name: Literal["adam"] = "adam"
-    betas: Tuple[float, float] = (0.95, 0.95)
+    betas: tuple[float, float] = (0.95, 0.95)
     learning_rate: float = 1e-3
     weight_decay: float = 0.0
 
@@ -45,6 +45,7 @@ class SGDConfig:
     momentum: float = 0.0
     learning_rate: float = 1e-3
     weight_decay: float = 0.0
+    nesterov: bool = False
 
 @dataclass
 class TrainConfig:
@@ -54,14 +55,15 @@ class TrainConfig:
         default="adam",
     )
     dataset: str = "mnist"
-    data_splits: Tuple[float, float] = (0.8, 0.1)
+    data_splits: tuple[float, ...] = (0.8, 0.1)
     n_epochs: int = 1024
     n_steps_per_epoch: int = 256
+    tasks: list[str] = field(default_factory=list)
 
 def main():
     parser = heracls.ArgumentParser()
     parser.add_argument("--dry", action="store_true", help="dry run")
-    parser.add_arguments(TrainConfig, "train")
+    parser.add_arguments(TrainConfig, dest="train", root=True)
 
     args = parser.parse_args()
 
@@ -82,7 +84,7 @@ if __name__ == "__main__":
 ```
 
 ```
-$ python train.py --dry --depth 5 --optimizer sgd --data_splits 0.7 0.2
+$ python train.py --dry --model.depth 5 --optimizer sgd --data_splits 0.7 0.2
 model:
   name: mlp
   depth: 5
@@ -92,46 +94,43 @@ optimizer:
   momentum: 0.0
   learning_rate: 0.001
   weight_decay: 0.0
+  nesterov: false
 dataset: mnist
 data_splits:
 - 0.7
 - 0.2
 n_epochs: 1024
 n_steps_per_epoch: 256
+tasks: []
 ```
 
 ```
 $ python train.py --help
-usage: train.py [-h] [--dry] [--optimizer {adam,sgd}] [--dataset str]
-                [--data_splits float float] [--n_epochs int] [--n_steps_per_epoch int]
-                [--model.name str] [--depth int] [--width int] [--optimizer.name {adam}]
-                [--betas float float] [--learning_rate float] [--weight_decay float]
+usage: train.py [-h] [--dry] [--model.name str] [--model.depth int] [--model.width int]
+                [--optimizer {adam,sgd}] [--dataset str] [--data_splits float [float ...]]
+                [--n_epochs int] [--n_steps_per_epoch int] [--tasks [str ...]]
+                [--optimizer.name {adam}] [--optimizer.betas float float]
+                [--optimizer.learning_rate float] [--optimizer.weight_decay float]
 
-options:
-  -h, --help                 show this help message and exit
-  --dry                      dry run (default: False)
+optional arguments:
+  -h, --help                       show this help message and exit
+  --dry                            dry run (default: False)
 
-TrainConfig ['train']:
-  TrainConfig(model: __main__.ModelConfig = <factory>, optimizer: Union[__main__.AdamConfig, __main__.SGDConfig] = <factory>, dataset: str = 'mnist', data_splits: Tuple[float, float] = (0.8, 0.1), n_epochs: int = 1024, n_steps_per_epoch: int = 256)
+  --optimizer {adam,sgd}           (default: adam)
+  --dataset str                    (default: mnist)
+  --data_splits float [float ...]  (default: (0.8, 0.1))
+  --n_epochs int                   (default: 1024)
+  --n_steps_per_epoch int          (default: 256)
+  --tasks [str ...]                (default: [])
 
-  --optimizer {adam,sgd}     (default: adam)
-  --dataset str              (default: mnist)
-  --data_splits float float  (default: (0.8, 0.1))
-  --n_epochs int             (default: 1024)
-  --n_steps_per_epoch int    (default: 256)
+model:
+  --model.name str                 (default: mlp)
+  --model.depth int                (default: 3)
+  --model.width int                (default: 256)
 
-ModelConfig ['train.model']:
-  ModelConfig(name: str = 'mlp', depth: int = 3, width: int = 256)
-
-  --model.name str           (default: mlp)
-  --depth int                (default: 3)
-  --width int                (default: 256)
-
-AdamConfig ['train.optimizer']:
-  AdamConfig(name: Literal['adam'] = 'adam', betas: Tuple[float, float] = (0.95, 0.95), learning_rate: float = 0.001, weight_decay: float = 0.0)
-
-  --optimizer.name {adam}    (default: adam)
-  --betas float float        (default: (0.95, 0.95))
-  --learning_rate float      (default: 0.001)
-  --weight_decay float       (default: 0.0)
+optimizer:
+  --optimizer.name {adam}          (default: adam)
+  --optimizer.betas float float    (default: (0.95, 0.95))
+  --optimizer.learning_rate float  (default: 0.001)
+  --optimizer.weight_decay float   (default: 0.0)
 ```
