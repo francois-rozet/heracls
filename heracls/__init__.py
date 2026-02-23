@@ -1,6 +1,6 @@
 """Heracls - Slayer of Hydra"""
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 from . import cli, core, patch  # noqa: F401
 from .cli import ArgumentParser, choice  # noqa: F401
