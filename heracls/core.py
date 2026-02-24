@@ -104,7 +104,7 @@ def from_yaml(data_cls: type[DC], data: str) -> DC:
     return from_dict(data_cls, yaml.safe_load(data))
 
 
-def to_yaml(data: Dataclass, **kwargs) -> str:
+def to_yaml(data: Dataclass, **kwargs) -> str:  # noqa: ANN003
     """Serialize a dataclass instance to a YAML string.
 
     Arguments:

@@ -1,12 +1,12 @@
 """Tests for the heracls module."""
 
 from dataclasses import dataclass, field
-from typing import Literal, Union
+from typing import Literal
 
 from heracls import ArgumentParser, choice, from_yaml, to_yaml
 
 
-def test_pipeline():
+def test_pipeline() -> None:
     @dataclass
     class ModelConfig:
         name: str = "mlp"
@@ -31,7 +31,7 @@ def test_pipeline():
     @dataclass
     class TrainConfig:
         model: ModelConfig = field(default_factory=ModelConfig)
-        optimizer: Union[AdamConfig, SGDConfig] = choice(
+        optimizer: AdamConfig | SGDConfig = choice(
             {"adam": AdamConfig, "sgd": SGDConfig},
             default="adam",
         )

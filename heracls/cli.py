@@ -11,11 +11,11 @@ import argparse
 import copy
 import json
 
+from collections.abc import Callable
 from dataclasses import MISSING, dataclass, field, is_dataclass
 from dataclasses import fields as iter_fields
 from functools import partial
 from typing import (
-    Callable,
     Generic,
     Literal,
     TypeVar,
@@ -120,10 +120,10 @@ class SimpleHelpFormatter(
     argparse.ArgumentDefaultsHelpFormatter,
     argparse.MetavarTypeHelpFormatter,
 ):
-    def _get_default_metavar_for_optional(self, action: argparse.Action):
+    def _get_default_metavar_for_optional(self, action: argparse.Action) -> str:
         return getattr(action.type, "__name__", None)
 
-    def _get_help_string(self, *args, **kwargs) -> str | None:
+    def _get_help_string(self, *args, **kwargs) -> str | None:  # noqa: ANN002, ANN003
         help = super()._get_help_string(*args, **kwargs)
         if isinstance(help, str):
             help = help.replace(HELP, "")
@@ -133,7 +133,7 @@ class SimpleHelpFormatter(
 class ArgumentParser(argparse.ArgumentParser):
     """Simple dataclass-aware argument parser."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:  # noqa: ANN002, ANN003
         kwargs.setdefault(
             "formatter_class",
             partial(
@@ -174,7 +174,7 @@ class ArgumentParser(argparse.ArgumentParser):
         spec: DataclassSpec,
         data_cls: type[Dataclass],
         path: tuple[str, ...] = (),
-    ):
+    ) -> None:
         if path:
             group = self.add_argument_group(".".join(path))
         else:
@@ -236,7 +236,11 @@ class ArgumentParser(argparse.ArgumentParser):
                 else:
                     group.add_argument(f_flag, type=any_parser(f.type), **kwargs)
 
-    def finalize(self, args=None, namespace=None) -> ArgumentParser:
+    def finalize(
+        self,
+        args: list[str] | None = None,
+        namespace: argparse.Namespace | None = None,
+    ) -> ArgumentParser:
         clone = copy.deepcopy(self)
         visited = set()
 
@@ -260,7 +264,11 @@ class ArgumentParser(argparse.ArgumentParser):
 
         return clone
 
-    def parse_known_args(self, args=None, namespace=None):
+    def parse_known_args(
+        self,
+        args: list[str] | None = None,
+        namespace: argparse.Namespace | None = None,
+    ) -> tuple[argparse.Namespace, list[str]]:
         clone = self.finalize(args, namespace)
 
         namespace, unknown = argparse.ArgumentParser.parse_known_args(
