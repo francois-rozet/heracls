@@ -34,20 +34,6 @@ DC = TypeVar("DC", bound=Dataclass)
 HELP = "<HELP>"
 
 
-@dataclass
-class ChoiceSpec(Generic[DC]):
-    options: dict[str, type[DC]]
-    default: str | None = None
-
-
-@dataclass
-class DataclassSpec:
-    data_cls: type[Dataclass]
-    keys: set[str]
-    choices: dict[str, ChoiceSpec]
-    root: bool
-
-
 def origin(t: T) -> T:
     return t if get_origin(t) is None else get_origin(t)
 
@@ -97,6 +83,20 @@ def any_parser(t: T) -> Callable[[str], T]:
     parser.__name__ = origin(t).__name__
 
     return parser
+
+
+@dataclass
+class ChoiceSpec(Generic[DC]):
+    options: dict[str, type[DC]]
+    default: str | None = None
+
+
+@dataclass
+class DataclassSpec:
+    data_cls: type[Dataclass]
+    keys: set[str]
+    choices: dict[str, ChoiceSpec]
+    root: bool
 
 
 def choice(
@@ -197,7 +197,9 @@ class ArgumentParser(argparse.ArgumentParser):
                 default = f.metadata["heracls_choice"].default
 
                 if default is None:
+                    kwargs["default"] = argparse.SUPPRESS
                     kwargs["required"] = True
+                    kwargs["help"] = None
                 else:
                     kwargs["default"] = default
 
@@ -208,7 +210,9 @@ class ArgumentParser(argparse.ArgumentParser):
                 spec.keys.add(f_key)
 
                 if f.default is MISSING and f.default_factory is MISSING:
+                    kwargs["default"] = argparse.SUPPRESS
                     kwargs["required"] = True
+                    kwargs["help"] = None
                 elif f.default is MISSING:
                     kwargs["default"] = f.default_factory()
                 else:

@@ -16,8 +16,8 @@ classifiers = [
   "Programming Language :: Python :: 3",
 ]
 dependencies = [
-    "dacite>=1.9.2",
-    "omegaconf>=2.3.0",
+  "dacite>=1.9.2",
+  "omegaconf>=2.3.0",
 ]
 dynamic = ["version"]
 keywords = ["config", "dataclass"]
