@@ -15,10 +15,12 @@ from collections.abc import Callable
 from dataclasses import MISSING, dataclass, field, is_dataclass
 from dataclasses import fields as iter_fields
 from functools import partial
+from types import UnionType
 from typing import (
     Generic,
     Literal,
     TypeVar,
+    Union,
     get_args,
     get_origin,
 )
@@ -29,18 +31,17 @@ from .typing import Dataclass
 
 T = TypeVar("T", bound=type)
 DC = TypeVar("DC", bound=Dataclass)
-HELP = "<HELP>"
 
 
 @dataclass
 class ChoiceSpec(Generic[DC]):
     options: dict[str, type[DC]]
-    default: str | None = MISSING
+    default: str | None = None
 
 
 @dataclass
 class DataclassSpec:
-    data_cls: Dataclass
+    data_cls: type[Dataclass]
     keys: set[str]
     choices: dict[str, ChoiceSpec]
     root: bool
@@ -99,35 +100,28 @@ def any_parser(t: T) -> Callable[[str], T]:
 
 def choice(
     options: dict[str, type[DC]],
-    default: str | None = MISSING,
-    default_factory: Callable[[], DC] | None = MISSING,
+    default: str | None = None,
+    default_factory: Callable[[], DC] | None = None,
 ) -> DC:
     """Create a dataclass field that gives a choice between named options."""
 
     for option in options.values():
         assert is_dataclass(option) and not is_dataclass(type(option))
 
-    if default_factory is MISSING and default is not MISSING:
+    if default_factory is None and default is not None:
         default_factory = options[default]
 
-    return field(
-        default_factory=default_factory,
-        metadata={"heracls_choice": ChoiceSpec(options, default)},
-    )
+    metadata = {"heracls_choice": ChoiceSpec(options, default)}
+
+    if default_factory is None:
+        return field(metadata=metadata)
+    else:
+        return field(default_factory=default_factory, metadata=metadata)
 
 
-class SimpleHelpFormatter(
-    argparse.ArgumentDefaultsHelpFormatter,
-    argparse.MetavarTypeHelpFormatter,
-):
+class SimpleHelpFormatter(argparse.MetavarTypeHelpFormatter):
     def _get_default_metavar_for_optional(self, action: argparse.Action) -> str:
         return getattr(action.type, "__name__", None)
-
-    def _get_help_string(self, *args, **kwargs) -> str | None:  # noqa: ANN002, ANN003
-        help = super()._get_help_string(*args, **kwargs)
-        if isinstance(help, str):
-            help = help.replace(HELP, "")
-        return help
 
 
 class ArgumentParser(argparse.ArgumentParser):
@@ -153,8 +147,7 @@ class ArgumentParser(argparse.ArgumentParser):
         dest: str = "config",
         root: bool = False,
     ) -> None:
-        assert is_dataclass(data_cls)
-        assert not is_dataclass(type(data_cls))
+        assert is_dataclass(data_cls) and not is_dataclass(type(data_cls))
         assert dest not in self.heracls_specs
 
         spec = DataclassSpec(
@@ -167,9 +160,9 @@ class ArgumentParser(argparse.ArgumentParser):
         assert dest not in self.heracls_specs
 
         self.heracls_specs[dest] = spec
-        self.register_dataclass(spec, data_cls, () if root else (dest,))
+        self._register_dataclass(spec, data_cls, () if root else (dest,))
 
-    def register_dataclass(
+    def _register_dataclass(
         self,
         spec: DataclassSpec,
         data_cls: type[Dataclass],
@@ -185,37 +178,50 @@ class ArgumentParser(argparse.ArgumentParser):
             f_key = ".".join(f_path)
             f_flag = f"--{f_key}"
 
+            kwargs = {"dest": f_key}
+
             if "heracls_choice" in f.metadata:
                 spec.choices[f_key] = f.metadata["heracls_choice"]
+
                 options = f.metadata["heracls_choice"].options
                 default = f.metadata["heracls_choice"].default
 
-                group.add_argument(
-                    f_flag,
-                    dest=f_key,
-                    choices=tuple(options.keys()),
-                    default=default,
-                    help=HELP,
-                )
-            elif is_dataclass(f.type):
-                self.register_dataclass(spec, f.type, f_path)
-            else:
-                if f.default is MISSING and f.default_factory is MISSING:
-                    default = None
-                elif f.default is MISSING:
-                    default = f.default_factory()
+                if default is None:
+                    kwargs["required"] = True
                 else:
-                    default = f.default
+                    kwargs["default"] = default
+                    kwargs["help"] = f"(default: {default})"
 
+                group.add_argument(f_flag, choices=tuple(options.keys()), **kwargs)
+            elif is_dataclass(f.type):
+                self._register_dataclass(spec, f.type, f_path)
+            else:
                 spec.keys.add(f_key)
 
-                kwargs = {"dest": f_key, "default": default, "help": HELP}
+                if f.default is MISSING and f.default_factory is MISSING:
+                    kwargs["required"] = True
+                else:
+                    if f.default is MISSING:
+                        default = f.default_factory()
+                    else:
+                        default = f.default
 
-                if origin(f.type) == Literal:
-                    types = get_args(f.type)
+                    kwargs["default"] = default
+                    kwargs["help"] = f"(default: {default})"
+
+                f_type = f.type
+
+                if origin(f_type) == Union or isinstance(f_type, UnionType):
+                    types = set(get_args(f_type))
+                    types.remove(type(None))
+                    if len(types) == 1:
+                        f_type = types.pop()
+
+                if origin(f_type) == Literal:
+                    types = get_args(f_type)
                     group.add_argument(f_flag, choices=types, **kwargs)
-                elif origin(f.type) is tuple:
-                    types = get_args(f.type)
+                elif origin(f_type) is tuple:
+                    types = get_args(f_type)
                     types = types if types else (str, Ellipsis)
 
                     if Ellipsis in types:
@@ -225,18 +231,18 @@ class ArgumentParser(argparse.ArgumentParser):
                             f_flag, nargs=len(types), type=any_parser(types[0]), **kwargs
                         )
                     else:
-                        group.add_argument(f_flag, type=any_parser(f.type), **kwargs)
-                elif origin(f.type) is list:
-                    types = get_args(f.type)
+                        group.add_argument(f_flag, type=any_parser(f_type), **kwargs)
+                elif origin(f_type) is list:
+                    types = get_args(f_type)
                     types = types if types else (str,)
 
                     group.add_argument(f_flag, nargs="*", type=any_parser(types[0]), **kwargs)
-                elif origin(f.type) is dict:
-                    group.add_argument(f_flag, type=any_parser(f.type), **kwargs)
+                elif origin(f_type) is dict:
+                    group.add_argument(f_flag, type=any_parser(f_type), **kwargs)
                 else:
-                    group.add_argument(f_flag, type=any_parser(f.type), **kwargs)
+                    group.add_argument(f_flag, type=any_parser(f_type), **kwargs)
 
-    def finalize(
+    def _finalize(
         self,
         args: list[str] | None = None,
         namespace: argparse.Namespace | None = None,
@@ -245,7 +251,10 @@ class ArgumentParser(argparse.ArgumentParser):
         visited = set()
 
         while True:
-            with patch("argparse._HelpAction.__call__"):
+            with (
+                patch("argparse.ArgumentParser.error"),
+                patch("argparse._HelpAction.__call__"),
+            ):
                 namespace, _ = argparse.ArgumentParser.parse_known_args(
                     clone, args=args, namespace=namespace
                 )
@@ -255,9 +264,10 @@ class ArgumentParser(argparse.ArgumentParser):
                 for key, choice in spec.choices.items():
                     if key not in visited:
                         visited.add(key)
-                        value = getattr(namespace, key)
-                        clone.register_dataclass(spec, choice.options[value], key.split("."))
-                        finished = False
+                        value = getattr(namespace, key, None)
+                        if value is not None:
+                            clone._register_dataclass(spec, choice.options[value], key.split("."))
+                            finished = False
 
             if finished:
                 break
@@ -269,23 +279,28 @@ class ArgumentParser(argparse.ArgumentParser):
         args: list[str] | None = None,
         namespace: argparse.Namespace | None = None,
     ) -> tuple[argparse.Namespace, list[str]]:
-        clone = self.finalize(args, namespace)
+        clone = self._finalize(args, namespace)
 
         namespace, unknown = argparse.ArgumentParser.parse_known_args(
             clone, args=args, namespace=namespace
         )
 
-        reverse = {}
+        dest_map = {}
+        choices = set()
+
         for dest, spec in clone.heracls_specs.items():
             for key in spec.keys:
-                reverse[key] = dest
+                dest_map[key] = dest
+            choices.update(spec.choices)
 
         data_dicts = {dest: {} for dest in clone.heracls_specs}
         others = {}
 
         for key, value in vars(namespace).items():
-            if key in reverse:
-                data_dicts[reverse[key]][key] = value
+            if key in dest_map:
+                data_dicts[dest_map[key]][key] = value
+            elif key in choices:
+                pass
             else:
                 others[key] = value
 

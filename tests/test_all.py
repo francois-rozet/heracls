@@ -12,6 +12,7 @@ def test_pipeline() -> None:
         name: str = "mlp"
         depth: int = 3
         width: int = 256
+        dropout: float | None = None
 
     @dataclass
     class AdamConfig:
@@ -49,8 +50,8 @@ def test_pipeline() -> None:
     parser.print_help()
 
     args = parser.parse_args([
-        "--model.depth",
-        "5",
+        "--model.dropout",
+        "0.1",
         "--optimizer",
         "sgd",
         "--data_splits",
@@ -61,7 +62,7 @@ def test_pipeline() -> None:
     ])
 
     assert args.train == TrainConfig(
-        model=ModelConfig(depth=5),
+        model=ModelConfig(dropout=0.1),
         optimizer=SGDConfig(),
         data_splits=(0.7, 0.2),
         magic={"p": 3, "i": 0.14},

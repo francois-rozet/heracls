@@ -22,7 +22,7 @@ The following example demonstrates how to declare a nested dataclass config, ins
 
 ```python
 from dataclasses import dataclass, field
-from typing import Literal, Union
+from typing import Literal
 
 import heracls
 
@@ -31,6 +31,7 @@ class ModelConfig:
     name: str = "mlp"
     depth: int = 3
     width: int = 256
+    dropout: float | None = None
 
 @dataclass
 class AdamConfig:
@@ -50,7 +51,7 @@ class SGDConfig:
 @dataclass
 class TrainConfig:
     model: ModelConfig = field(default_factory=ModelConfig)
-    optimizer: Union[AdamConfig, SGDConfig] = heracls.choice(
+    optimizer: AdamConfig | SGDConfig = heracls.choice(
         {"adam": AdamConfig, "sgd": SGDConfig},
         default="adam",
     )
@@ -60,7 +61,7 @@ class TrainConfig:
     n_steps_per_epoch: int = 256
     tasks: list[str] = field(default_factory=list)
 
-def main():
+def main() -> None:
     parser = heracls.ArgumentParser()
     parser.add_argument("--dry", action="store_true", help="dry run")
     parser.add_arguments(TrainConfig, dest="train", root=True)
@@ -73,7 +74,6 @@ def main():
         return
 
     trainset, validset, testset = load_dataset(args.train.data_splits)
-
     model = init_model(args.train.model)
 
     for epoch in range(args.train.n_epochs):
@@ -84,11 +84,12 @@ if __name__ == "__main__":
 ```
 
 ```
-$ python train.py --dry --model.depth 5 --optimizer sgd --data_splits 0.7 0.2
+$ python examples/train.py --dry --model.dropout 0.1 --optimizer sgd --data_splits 0.7 0.2
 model:
   name: mlp
-  depth: 5
+  depth: 3
   width: 256
+  dropout: 0.1
 optimizer:
   name: sgd
   momentum: 0.0
@@ -105,16 +106,16 @@ tasks: []
 ```
 
 ```
-$ python train.py --help
+$ python examples/train.py --help
 usage: train.py [-h] [--dry] [--model.name str] [--model.depth int] [--model.width int]
-                [--optimizer {adam,sgd}] [--dataset str] [--data_splits float [float ...]]
-                [--n_epochs int] [--n_steps_per_epoch int] [--tasks [str ...]]
-                [--optimizer.name {adam}] [--optimizer.betas float float]
+                [--model.dropout float] [--optimizer {adam,sgd}] [--dataset str]
+                [--data_splits float [float ...]] [--n_epochs int] [--n_steps_per_epoch int]
+                [--tasks [str ...]] [--optimizer.name {adam}] [--optimizer.betas float float]
                 [--optimizer.learning_rate float] [--optimizer.weight_decay float]
 
-optional arguments:
+options:
   -h, --help                       show this help message and exit
-  --dry                            dry run (default: False)
+  --dry                            dry run
 
   --optimizer {adam,sgd}           (default: adam)
   --dataset str                    (default: mnist)
@@ -127,6 +128,7 @@ model:
   --model.name str                 (default: mlp)
   --model.depth int                (default: 3)
   --model.width int                (default: 256)
+  --model.dropout float            (default: None)
 
 optimizer:
   --optimizer.name {adam}          (default: adam)
