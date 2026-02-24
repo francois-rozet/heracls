@@ -31,6 +31,7 @@ from .typing import Dataclass
 
 T = TypeVar("T", bound=type)
 DC = TypeVar("DC", bound=Dataclass)
+HELP = "<HELP>"
 
 
 @dataclass
@@ -119,9 +120,18 @@ def choice(
         return field(default_factory=default_factory, metadata=metadata)
 
 
-class SimpleHelpFormatter(argparse.MetavarTypeHelpFormatter):
+class SimpleHelpFormatter(
+    argparse.ArgumentDefaultsHelpFormatter,
+    argparse.MetavarTypeHelpFormatter,
+):
     def _get_default_metavar_for_optional(self, action: argparse.Action) -> str:
         return getattr(action.type, "__name__", None)
+
+    def _get_help_string(self, *args, **kwargs) -> str | None:  # noqa: ANN002, ANN003
+        help = super()._get_help_string(*args, **kwargs)
+        if help is not None:
+            help = help.replace(HELP, "")
+        return help
 
 
 class ArgumentParser(argparse.ArgumentParser):
@@ -178,7 +188,7 @@ class ArgumentParser(argparse.ArgumentParser):
             f_key = ".".join(f_path)
             f_flag = f"--{f_key}"
 
-            kwargs = {"dest": f_key}
+            kwargs = {"dest": f_key, "help": HELP}
 
             if "heracls_choice" in f.metadata:
                 spec.choices[f_key] = f.metadata["heracls_choice"]
@@ -190,7 +200,6 @@ class ArgumentParser(argparse.ArgumentParser):
                     kwargs["required"] = True
                 else:
                     kwargs["default"] = default
-                    kwargs["help"] = f"(default: {default})"
 
                 group.add_argument(f_flag, choices=tuple(options.keys()), **kwargs)
             elif is_dataclass(f.type):
@@ -200,14 +209,10 @@ class ArgumentParser(argparse.ArgumentParser):
 
                 if f.default is MISSING and f.default_factory is MISSING:
                     kwargs["required"] = True
+                elif f.default is MISSING:
+                    kwargs["default"] = f.default_factory()
                 else:
-                    if f.default is MISSING:
-                        default = f.default_factory()
-                    else:
-                        default = f.default
-
-                    kwargs["default"] = default
-                    kwargs["help"] = f"(default: {default})"
+                    kwargs["default"] = f.default
 
                 f_type = f.type
 

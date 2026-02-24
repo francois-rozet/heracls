@@ -115,7 +115,7 @@ usage: train.py [-h] [--dry] [--model.name str] [--model.depth int] [--model.wid
 
 options:
   -h, --help                       show this help message and exit
-  --dry                            dry run
+  --dry                            dry run (default: False)
 
   --optimizer {adam,sgd}           (default: adam)
   --dataset str                    (default: mnist)
