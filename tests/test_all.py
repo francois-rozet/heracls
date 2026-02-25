@@ -67,6 +67,17 @@ def test_from_dict() -> None:
         data_splits=(0.7, 0.2),
     )
 
+    data = {
+        "output": "./out",
+        "optimizer": AdamConfig(),
+    }
+    cfg = heracls.from_dict(TrainConfig, data)
+
+    assert cfg == TrainConfig(
+        output="./out",
+        optimizer=AdamConfig(),
+    )
+
 
 def test_from_dotlist() -> None:
     data = ["output=./out", "model.dropout=0.1", "optimizer.nesterov=yes", "data_splits=[0.7,0.2]"]
@@ -96,6 +107,13 @@ def test_ArgumentParser() -> None:
     parser.add_arguments(TrainConfig, dest="train", root=True)
 
     parser._finalize().print_help()
+
+    args = parser.parse_args([
+        "--output",
+        "./out",
+    ])
+
+    assert args.train == TrainConfig(output="./out")
 
     args = parser.parse_args([
         "--output",

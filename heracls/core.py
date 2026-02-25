@@ -11,16 +11,15 @@ __all__ = [
 ]
 
 import cattrs
+import dataclasses
 import yaml
 
-from dataclasses import asdict, is_dataclass
-from dataclasses import fields as iter_fields
 from functools import partial
 from omegaconf import DictConfig, OmegaConf
 from types import UnionType
 from typing import Any, TypeVar, get_args
 
-from .typing import Dataclass, get_origin, is_literal, is_union, type_repr
+from .typing import Dataclass, get_origin, is_dataclass_instance, is_literal, is_union, type_repr
 
 DC = TypeVar("DC", bound=Dataclass)
 
@@ -31,6 +30,8 @@ def structure_union(
     u: UnionType,
 ) -> Any:  # noqa: ANN401
     matches = []
+
+    unstruct = conv.unstructure(val)
 
     for t in get_args(u):
         origin = get_origin(t)
@@ -49,7 +50,7 @@ def structure_union(
                 else:
                     score = 0
 
-                matches.append((t, score, conv.structure(val, t)))
+                matches.append((t, score, conv.structure(unstruct, t)))
             except Exception:  # noqa: BLE001, S110
                 pass
 
@@ -93,11 +94,11 @@ def to_dict(data: Dataclass, *, recursive: bool = True) -> dict[str, Any]:
     Returns:
         A dictionary representation of `data`.
     """
-    if not is_dataclass(type(data)):
+    if not is_dataclass_instance(data):
         return data
     elif recursive:
-        return asdict(data)
-    keys = [f.name for f in iter_fields(data)]
+        return dataclasses.asdict(data)
+    keys = [f.name for f in dataclasses.fields(data)]
     data = {k: getattr(data, k) for k in keys}
     return data
 

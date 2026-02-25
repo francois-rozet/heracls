@@ -1,5 +1,6 @@
 """Types and protocols."""
 
+from dataclasses import is_dataclass
 from types import UnionType
 from typing import Any, ClassVar, Literal, Protocol, Union, get_args
 from typing import get_origin as _get_origin
@@ -12,6 +13,14 @@ class Dataclass(Protocol):
 def get_origin(t: type) -> type:
     origin = _get_origin(t)
     return t if origin is None else origin
+
+
+def is_dataclass_instance(x: Any) -> bool:  # noqa: ANN401
+    return is_dataclass(type(x))
+
+
+def is_dataclass_type(x: Any) -> bool:  # noqa: ANN401
+    return is_dataclass(x) and not is_dataclass_instance(x)
 
 
 def is_literal(t: type) -> bool:

@@ -13,7 +13,7 @@ import dataclasses
 import json
 
 from collections.abc import Callable
-from dataclasses import MISSING, dataclass, is_dataclass
+from dataclasses import MISSING, dataclass
 from functools import partial
 from numbers import Number
 from typing import (
@@ -24,7 +24,7 @@ from typing import (
 from unittest.mock import patch
 
 from .core import from_dict
-from .typing import Dataclass, get_origin, is_literal, is_union, type_repr
+from .typing import Dataclass, get_origin, is_dataclass_type, is_literal, is_union, type_repr
 
 T = TypeVar("T")
 DC = TypeVar("DC", bound=Dataclass)
@@ -70,12 +70,15 @@ def field(
 class ChoiceAction(argparse.Action):
     def __init__(
         self,
-        *args,  # noqa: ANN002
+        option_strings: list[str],
+        dest: str,
+        *,
         table: dict[str, type[Dataclass] | Callable[[], Any]],
         **kwargs,  # noqa: ANN003
     ) -> None:
-        super().__init__(*args, **kwargs)
+        super().__init__(option_strings, dest, **kwargs)
         self.table = table
+        self.dest_value = dest.removesuffix(":choice")
 
     def __call__(
         self,
@@ -86,11 +89,13 @@ class ChoiceAction(argparse.Action):
     ) -> None:
         value = self.table[choice]
 
-        if is_dataclass(value) and not is_dataclass(type(value)):
-            setattr(namespace, self.dest, {})
-            setattr(namespace, f"{self.dest}:choice", choice)
+        if is_dataclass_type(value):
+            if hasattr(namespace, self.dest_value):
+                delattr(namespace, self.dest_value)
         else:
-            setattr(namespace, self.dest, value())
+            setattr(namespace, self.dest_value, value())
+
+        setattr(namespace, self.dest, choice)
 
 
 class HelpFormatter(
@@ -137,7 +142,7 @@ class ArgumentParser(argparse.ArgumentParser):
         dest: str = "config",
         root: bool = False,
     ) -> None:
-        assert is_dataclass(data_cls) and not is_dataclass(type(data_cls))
+        assert is_dataclass_type(data_cls)
         assert dest not in self.heracls_specs
 
         spec = DataclassSpec(
@@ -145,8 +150,6 @@ class ArgumentParser(argparse.ArgumentParser):
             keys=set(),
             choices={},
         )
-
-        assert dest not in self.heracls_specs
 
         self.heracls_specs[dest] = spec
         self._register_dataclass(spec, data_cls, () if root else (dest,))
@@ -169,11 +172,12 @@ class ArgumentParser(argparse.ArgumentParser):
 
             spec.keys.add(f_dest)
 
-            kwargs = {"dest": f_dest}
+            kwargs = {}
 
             if "heracls_choices" in f.metadata:
                 spec.choices[f_dest] = table = f.metadata["heracls_choices"]
 
+                kwargs["dest"] = f"{f_dest}:choice"
                 kwargs["default"] = next(iter(table.keys()))
                 kwargs["help"] = HELP
 
@@ -184,9 +188,11 @@ class ArgumentParser(argparse.ArgumentParser):
                     table=table,
                     **kwargs,
                 )
-            elif is_dataclass(f.type):
+            elif is_dataclass_type(f.type):
                 self._register_dataclass(spec, f.type, f_path)
             else:
+                kwargs["dest"] = f_dest
+
                 if f.default is MISSING and f.default_factory is MISSING:
                     kwargs["default"] = argparse.SUPPRESS
                     kwargs["required"] = True
@@ -222,8 +228,8 @@ class ArgumentParser(argparse.ArgumentParser):
                 patch("argparse.ArgumentParser.error"),
                 patch("argparse._HelpAction.__call__"),
             ):
-                namespace, _ = argparse.ArgumentParser.parse_known_args(
-                    clone, args=args, namespace=namespace
+                namespace_clone, _ = argparse.ArgumentParser.parse_known_args(
+                    clone, args=args, namespace=copy.copy(namespace)
                 )
 
             finished = True
@@ -231,9 +237,10 @@ class ArgumentParser(argparse.ArgumentParser):
                 for dest, table in spec.choices.items():
                     if dest not in visited:
                         visited.add(dest)
-                        choice = getattr(namespace, f"{dest}:choice", None)
-                        if choice is not None:
-                            clone._register_dataclass(spec, table[choice], dest.split("."))
+                        choice = getattr(namespace_clone, f"{dest}:choice")
+                        value = table[choice]
+                        if is_dataclass_type(value):
+                            clone._register_dataclass(spec, value, dest.split("."))
                             finished = False
 
             if finished:
