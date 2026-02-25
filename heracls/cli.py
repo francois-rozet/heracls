@@ -4,21 +4,21 @@ from __future__ import annotations
 
 __all__ = [
     "ArgumentParser",
-    "choice",
+    "field",
 ]
 
 import argparse
 import copy
+import dataclasses
 import json
 
 from collections.abc import Callable
-from dataclasses import MISSING, dataclass, field, is_dataclass
-from dataclasses import fields as iter_fields
+from dataclasses import MISSING, dataclass, is_dataclass
 from functools import partial
 from numbers import Number
 from types import UnionType
 from typing import (
-    Generic,
+    Any,
     Literal,
     TypeVar,
     Union,
@@ -30,7 +30,7 @@ from unittest.mock import patch
 from .core import from_dict
 from .typing import Dataclass
 
-T = TypeVar("T", bound=type)
+T = TypeVar("T")
 DC = TypeVar("DC", bound=Dataclass)
 HELP = "<HELP>"
 
@@ -67,11 +67,11 @@ def string_parser(t: type[T]) -> Callable[[str], T]:
     if issubclass(origin(t), bool):
         return boolean
     elif issubclass(origin(t), (str, Number)):
-        parser = lambda s: t(s)  # noqa: E731
+        parser = lambda s: t(s)
     elif issubclass(origin(t), (dict, list, tuple)):
-        parser = lambda s: json.loads(s)  # noqa: E731
+        parser = lambda s: json.loads(s)
     else:
-        parser = lambda s: s  # noqa: E731
+        parser = lambda s: s
 
     parser.__name__ = type_repr(t)
 
@@ -79,38 +79,51 @@ def string_parser(t: type[T]) -> Callable[[str], T]:
 
 
 @dataclass
-class ChoiceSpec(Generic[DC]):
-    options: dict[str, type[DC]]
-    default: str | None = None
-
-
-@dataclass
 class DataclassSpec:
     data_cls: type[Dataclass]
     keys: set[str]
-    choices: dict[str, ChoiceSpec]
-    root: bool
+    choices: dict[str, dict[str, type[Dataclass] | Callable[[], Any]]]
 
 
-def choice(
-    options: dict[str, type[DC]],
-    default: str | None = None,
-    default_factory: Callable[[], DC] | None = None,
-) -> DC:
-    """Create a dataclass field that gives a choice between named options."""
+def field(
+    *,
+    choices: dict[str, type[Dataclass] | Callable[[], Any]],
+    **kwargs,  # noqa: ANN003
+) -> Any:  # noqa: ANN401
+    """Create a dataclass field that declares named choices for the parser."""
 
-    for option in options.values():
-        assert is_dataclass(option) and not is_dataclass(type(option))
+    assert choices
 
-    if default_factory is None and default is not None:
-        default_factory = options[default]
+    metadata = kwargs.setdefault("metadata", {})
+    metadata.update(heracls_choices=choices)
 
-    metadata = {"heracls_choice": ChoiceSpec(options, default)}
+    return dataclasses.field(**kwargs)
 
-    if default_factory is None:
-        return field(metadata=metadata)
-    else:
-        return field(default_factory=default_factory, metadata=metadata)
+
+class ChoiceAction(argparse.Action):
+    def __init__(
+        self,
+        *args,  # noqa: ANN002
+        table: dict[str, type[Dataclass] | Callable[[], Any]],
+        **kwargs,  # noqa: ANN003
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self.table = table
+
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        choice: str,
+        flag: str | None = None,
+    ) -> None:
+        value = self.table[choice]
+
+        if is_dataclass(value) and not is_dataclass(type(value)):
+            setattr(namespace, self.dest, {})
+            setattr(namespace, f"{self.dest}:choice", choice)
+        else:
+            setattr(namespace, self.dest, value())
 
 
 class SimpleHelpFormatter(
@@ -157,7 +170,6 @@ class ArgumentParser(argparse.ArgumentParser):
             data_cls=data_cls,
             keys=set(),
             choices={},
-            root=root,
         )
 
         assert dest not in self.heracls_specs
@@ -176,40 +188,40 @@ class ArgumentParser(argparse.ArgumentParser):
         else:
             group = self.add_argument_group()
 
-        for f in iter_fields(data_cls):
+        for f in dataclasses.fields(data_cls):
             f_path = (*path, f.name)
-            f_key = ".".join(f_path)
-            f_flag = f"--{f_key}"
+            f_dest = ".".join(f_path)
+            f_flag = f"--{f_dest}"
 
-            kwargs = {"dest": f_key, "help": HELP}
+            spec.keys.add(f_dest)
 
-            if "heracls_choice" in f.metadata:
-                spec.choices[f_key] = f.metadata["heracls_choice"]
+            kwargs = {"dest": f_dest}
 
-                options = f.metadata["heracls_choice"].options
-                default = f.metadata["heracls_choice"].default
+            if "heracls_choices" in f.metadata:
+                spec.choices[f_dest] = table = f.metadata["heracls_choices"]
 
-                if default is None:
-                    kwargs["default"] = argparse.SUPPRESS
-                    kwargs["required"] = True
-                    kwargs["help"] = None
-                else:
-                    kwargs["default"] = default
+                kwargs["default"] = next(iter(table.keys()))
+                kwargs["help"] = HELP
 
-                group.add_argument(f_flag, choices=tuple(options.keys()), **kwargs)
+                group.add_argument(
+                    f_flag,
+                    choices=tuple(table.keys()),
+                    action=ChoiceAction,
+                    table=table,
+                    **kwargs,
+                )
             elif is_dataclass(f.type):
                 self._register_dataclass(spec, f.type, f_path)
             else:
-                spec.keys.add(f_key)
-
                 if f.default is MISSING and f.default_factory is MISSING:
                     kwargs["default"] = argparse.SUPPRESS
                     kwargs["required"] = True
-                    kwargs["help"] = None
                 elif f.default is MISSING:
                     kwargs["default"] = f.default_factory()
+                    kwargs["help"] = HELP
                 else:
                     kwargs["default"] = f.default
+                    kwargs["help"] = HELP
 
                 f_type = f.type
 
@@ -243,12 +255,12 @@ class ArgumentParser(argparse.ArgumentParser):
 
             finished = True
             for spec in clone.heracls_specs.values():
-                for key, choice in spec.choices.items():
-                    if key not in visited:
-                        visited.add(key)
-                        value = getattr(namespace, key, None)
-                        if value is not None:
-                            clone._register_dataclass(spec, choice.options[value], key.split("."))
+                for dest, table in spec.choices.items():
+                    if dest not in visited:
+                        visited.add(dest)
+                        choice = getattr(namespace, f"{dest}:choice", None)
+                        if choice is not None:
+                            clone._register_dataclass(spec, table[choice], dest.split("."))
                             finished = False
 
             if finished:
@@ -268,21 +280,19 @@ class ArgumentParser(argparse.ArgumentParser):
         )
 
         dest_map = {}
-        choices = set()
 
         for dest, spec in clone.heracls_specs.items():
             for key in spec.keys:
                 dest_map[key] = dest
-            choices.update(spec.choices)
 
         data_dicts = {dest: {} for dest in clone.heracls_specs}
         others = {}
 
         for key, value in vars(namespace).items():
-            if key in dest_map:
-                data_dicts[dest_map[key]][key] = value
-            elif key in choices:
+            if key.endswith(":choice"):
                 pass
+            elif key in dest_map:
+                data_dicts[dest_map[key]][key] = value
             else:
                 others[key] = value
 

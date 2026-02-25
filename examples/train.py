@@ -33,9 +33,9 @@ class SGDConfig:
 class TrainConfig:
     output: str
     model: ModelConfig = field(default_factory=ModelConfig)
-    optimizer: AdamConfig | SGDConfig = heracls.choice(
-        {"adam": AdamConfig, "sgd": SGDConfig},
-        default="adam",
+    optimizer: AdamConfig | SGDConfig = heracls.field(
+        choices={"adam": AdamConfig, "sgd": SGDConfig},
+        default_factory=AdamConfig,
     )
     dataset: str = "mnist"
     data_splits: tuple[float, ...] = (0.8, 0.1)

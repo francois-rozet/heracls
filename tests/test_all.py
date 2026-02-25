@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
-from heracls import ArgumentParser, choice, from_dict, from_dotlist, from_yaml, to_yaml
+import heracls
 
 
 @dataclass
@@ -36,9 +36,9 @@ class SGDConfig:
 class TrainConfig:
     output: str | Path
     model: ModelConfig = field(default_factory=ModelConfig)
-    optimizer: AdamConfig | SGDConfig = choice(
-        {"adam": AdamConfig, "sgd": SGDConfig},
-        default="adam",
+    optimizer: AdamConfig | SGDConfig = heracls.field(
+        choices={"adam": AdamConfig, "sgd": SGDConfig},
+        default_factory=AdamConfig,
     )
     dataset: str = "mnist"
     data_splits: tuple[float, ...] = (0.8, 0.1)
@@ -55,7 +55,7 @@ def test_from_dict() -> None:
         "optimizer": {"momentum": 0.9},
         "data_splits": [0.7, 0.2],
     }
-    cfg = from_dict(TrainConfig, data)
+    cfg = heracls.from_dict(TrainConfig, data)
 
     assert cfg == TrainConfig(
         output="./out",
@@ -67,7 +67,7 @@ def test_from_dict() -> None:
 
 def test_from_dotlist() -> None:
     data = ["output=./out", "model.dropout=0.1", "optimizer.nesterov=yes", "data_splits=[0.7,0.2]"]
-    cfg = from_dotlist(TrainConfig, data)
+    cfg = heracls.from_dotlist(TrainConfig, data)
 
     assert cfg == TrainConfig(
         output="./out",
@@ -78,7 +78,7 @@ def test_from_dotlist() -> None:
 
 
 def test_ArgumentParser() -> None:
-    parser = ArgumentParser()
+    parser = heracls.ArgumentParser()
     parser.add_argument("--dry", action="store_true", help="dry run")
     parser.add_arguments(TrainConfig, dest="train", root=True)
 
@@ -105,8 +105,6 @@ def test_ArgumentParser() -> None:
         magic={"p": 3, "i": 0.14},
     )
 
-    raise
+    dump = heracls.to_yaml(args.train)
 
-    dump = to_yaml(args.train)
-
-    assert from_yaml(TrainConfig, dump) == args.train
+    assert heracls.from_yaml(TrainConfig, dump) == args.train
