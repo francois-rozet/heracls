@@ -1,6 +1,7 @@
 """Tests for the heracls module."""
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Literal
 
 from heracls import ArgumentParser, choice, from_dict, from_dotlist, from_yaml, to_yaml
@@ -33,7 +34,7 @@ class SGDConfig:
 
 @dataclass
 class TrainConfig:
-    output: str
+    output: str | Path
     model: ModelConfig = field(default_factory=ModelConfig)
     optimizer: AdamConfig | SGDConfig = choice(
         {"adam": AdamConfig, "sgd": SGDConfig},
@@ -48,7 +49,12 @@ class TrainConfig:
 
 
 def test_from_dict() -> None:
-    data = {"output": "./out", "model": {"dropout": 0.1}, "optimizer": {"momentum": 0.9}, "data_splits": [0.7, 0.2]}
+    data = {
+        "output": "./out",
+        "model": {"dropout": 0.1},
+        "optimizer": {"momentum": 0.9},
+        "data_splits": [0.7, 0.2],
+    }
     cfg = from_dict(TrainConfig, data)
 
     assert cfg == TrainConfig(
@@ -76,7 +82,7 @@ def test_ArgumentParser() -> None:
     parser.add_argument("--dry", action="store_true", help="dry run")
     parser.add_arguments(TrainConfig, dest="train", root=True)
 
-    parser.print_help()
+    parser._finalize().print_help()
 
     args = parser.parse_args([
         "--output",
@@ -86,8 +92,7 @@ def test_ArgumentParser() -> None:
         "--optimizer",
         "sgd",
         "--data_splits",
-        "0.7",
-        "0.2",
+        "[0.7, 0.2]",
         "--magic",
         r'{"p": 3, "i": 0.14}',
     ])
@@ -99,6 +104,8 @@ def test_ArgumentParser() -> None:
         data_splits=(0.7, 0.2),
         magic={"p": 3, "i": 0.14},
     )
+
+    raise
 
     dump = to_yaml(args.train)
 

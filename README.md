@@ -50,6 +50,7 @@ class SGDConfig:
 
 @dataclass
 class TrainConfig:
+    output: str
     model: ModelConfig = field(default_factory=ModelConfig)
     optimizer: AdamConfig | SGDConfig = heracls.choice(
         {"adam": AdamConfig, "sgd": SGDConfig},
@@ -84,7 +85,8 @@ if __name__ == "__main__":
 ```
 
 ```
-$ python examples/train.py --dry --model.dropout 0.1 --optimizer sgd --data_splits 0.7 0.2
+$ python examples/train.py --dry --output ./out --model.dropout 0.1 --optimizer sgd --data_splits '[0.7, 0.2]'
+output: ./out
 model:
   name: mlp
   depth: 3
@@ -107,32 +109,34 @@ tasks: []
 
 ```
 $ python examples/train.py --help
-usage: train.py [-h] [--dry] [--model.name str] [--model.depth int] [--model.width int]
-                [--model.dropout float] [--optimizer {adam,sgd}] [--dataset str]
-                [--data_splits float [float ...]] [--n_epochs int] [--n_steps_per_epoch int]
-                [--tasks [str ...]] [--optimizer.name {adam}] [--optimizer.betas float float]
-                [--optimizer.learning_rate float] [--optimizer.weight_decay float]
+usage: train.py [-h] [--dry] --output str [--model.name str] [--model.depth int]
+                [--model.width int] [--model.dropout float] [--optimizer {adam,sgd}]
+                [--dataset str] [--data_splits tuple[float, ...]] [--n_epochs int]
+                [--n_steps_per_epoch int] [--tasks list[str]] [--optimizer.name {adam}]
+                [--optimizer.betas tuple[float, float]] [--optimizer.learning_rate float]
+                [--optimizer.weight_decay float]
 
 options:
-  -h, --help                       show this help message and exit
-  --dry                            dry run (default: False)
+  -h, --help                             show this help message and exit
+  --dry                                  dry run (default: False)
 
-  --optimizer {adam,sgd}           (default: adam)
-  --dataset str                    (default: mnist)
-  --data_splits float [float ...]  (default: (0.8, 0.1))
-  --n_epochs int                   (default: 1024)
-  --n_steps_per_epoch int          (default: 256)
-  --tasks [str ...]                (default: [])
+  --output str
+  --optimizer {adam,sgd}                 (default: adam)
+  --dataset str                          (default: mnist)
+  --data_splits tuple[float, ...]        (default: (0.8, 0.1))
+  --n_epochs int                         (default: 1024)
+  --n_steps_per_epoch int                (default: 256)
+  --tasks list[str]                      (default: [])
 
 model:
-  --model.name str                 (default: mlp)
-  --model.depth int                (default: 3)
-  --model.width int                (default: 256)
-  --model.dropout float            (default: None)
+  --model.name str                       (default: mlp)
+  --model.depth int                      (default: 3)
+  --model.width int                      (default: 256)
+  --model.dropout float                  (default: None)
 
 optimizer:
-  --optimizer.name {adam}          (default: adam)
-  --optimizer.betas float float    (default: (0.95, 0.95))
-  --optimizer.learning_rate float  (default: 0.001)
-  --optimizer.weight_decay float   (default: 0.0)
+  --optimizer.name {adam}                (default: adam)
+  --optimizer.betas tuple[float, float]  (default: (0.95, 0.95))
+  --optimizer.learning_rate float        (default: 0.001)
+  --optimizer.weight_decay float         (default: 0.0)
 ```

@@ -15,6 +15,7 @@ from collections.abc import Callable
 from dataclasses import MISSING, dataclass, field, is_dataclass
 from dataclasses import fields as iter_fields
 from functools import partial
+from numbers import Number
 from types import UnionType
 from typing import (
     Generic,
@@ -38,49 +39,41 @@ def origin(t: T) -> T:
     return t if get_origin(t) is None else get_origin(t)
 
 
+def type_repr(t: type) -> str:
+    args = get_args(t)
+
+    if t is Ellipsis:
+        return "..."
+    elif t is type(None):
+        return "None"
+    elif origin(t) == Literal:
+        return "{" + ",".join(map(repr, args)) + "}"
+    elif origin(t) == Union or isinstance(t, UnionType):
+        return "union[" + ", ".join(map(type_repr, args)) + "]"
+
+    r = getattr(origin(t), "__name__", repr(origin(t)))
+
+    if args:
+        return r + "[" + ", ".join(map(type_repr, args)) + "]"
+    else:
+        return r
+
+
 def boolean(s: str) -> bool:
     return s.lower() in {"1", "true", "yes", "on"}
 
 
-def dict_parser(t: T) -> Callable[[str], T]:
-    return lambda s: json.loads(s)
-
-
-def tuple_parser(t: T) -> Callable[[str], T]:
-    types = get_args(t)
-    types = types if types else (str, Ellipsis)
-
-    if Ellipsis in types:
-        parser = any_parser(types[0])
-        return lambda s: tuple(parser(x) for x in s.split())
-    else:
-        parsers = map(any_parser, types)
-        return lambda s: tuple(parser(x) for parser, x in zip(parsers, s.split(), strict=True))
-
-
-def list_parser(t: T) -> Callable[[str], T]:
-    types = get_args(t)
-    types = types if types else (str,)
-
-    parser = any_parser(types[0])
-    return lambda s: [parser(x) for x in s.split()]
-
-
-def any_parser(t: T) -> Callable[[str], T]:
-    if origin(t) in (int, float, str):
-        return origin(t)
-    if origin(t) is bool:
+def string_parser(t: type[T]) -> Callable[[str], T]:
+    if issubclass(origin(t), bool):
         return boolean
-    elif origin(t) is dict:
-        parser = dict_parser(t)
-    elif origin(t) is tuple:
-        parser = tuple_parser(t)
-    elif origin(t) is list:
-        parser = list_parser(t)
+    elif issubclass(origin(t), (str, Number)):
+        parser = lambda s: t(s)  # noqa: E731
+    elif issubclass(origin(t), (dict, list, tuple)):
+        parser = lambda s: json.loads(s)  # noqa: E731
     else:
-        return str
+        parser = lambda s: s  # noqa: E731
 
-    parser.__name__ = origin(t).__name__
+    parser.__name__ = type_repr(t)
 
     return parser
 
@@ -221,35 +214,15 @@ class ArgumentParser(argparse.ArgumentParser):
                 f_type = f.type
 
                 if origin(f_type) == Union or isinstance(f_type, UnionType):
-                    types = set(get_args(f_type))
-                    types.remove(type(None))
+                    types = set(get_args(f_type)) - {type(None)}
                     if len(types) == 1:
                         f_type = types.pop()
 
                 if origin(f_type) == Literal:
                     types = get_args(f_type)
                     group.add_argument(f_flag, choices=types, **kwargs)
-                elif origin(f_type) is tuple:
-                    types = get_args(f_type)
-                    types = types if types else (str, Ellipsis)
-
-                    if Ellipsis in types:
-                        group.add_argument(f_flag, nargs="+", type=any_parser(types[0]), **kwargs)
-                    elif all(t == types[0] for t in types):
-                        group.add_argument(
-                            f_flag, nargs=len(types), type=any_parser(types[0]), **kwargs
-                        )
-                    else:
-                        group.add_argument(f_flag, type=any_parser(f_type), **kwargs)
-                elif origin(f_type) is list:
-                    types = get_args(f_type)
-                    types = types if types else (str,)
-
-                    group.add_argument(f_flag, nargs="*", type=any_parser(types[0]), **kwargs)
-                elif origin(f_type) is dict:
-                    group.add_argument(f_flag, type=any_parser(f_type), **kwargs)
                 else:
-                    group.add_argument(f_flag, type=any_parser(f_type), **kwargs)
+                    group.add_argument(f_flag, type=string_parser(f_type), **kwargs)
 
     def _finalize(
         self,

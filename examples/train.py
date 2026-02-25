@@ -31,6 +31,7 @@ class SGDConfig:
 
 @dataclass
 class TrainConfig:
+    output: str
     model: ModelConfig = field(default_factory=ModelConfig)
     optimizer: AdamConfig | SGDConfig = heracls.choice(
         {"adam": AdamConfig, "sgd": SGDConfig},
