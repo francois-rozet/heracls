@@ -16,7 +16,7 @@ classifiers = [
   "Programming Language :: Python :: 3",
 ]
 dependencies = [
-  "dacite>=1.9.2",
+  "cattrs>=24.1.0",
   "omegaconf>=2.3.0",
 ]
 dynamic = ["version"]

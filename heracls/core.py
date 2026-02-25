@@ -10,17 +10,58 @@ __all__ = [
     "to_yaml",
 ]
 
-import dacite
+import cattrs
 import yaml
 
 from dataclasses import asdict, is_dataclass
 from dataclasses import fields as iter_fields
+from functools import partial
 from omegaconf import DictConfig, OmegaConf
-from typing import Any, TypeVar
+from types import UnionType
+from typing import Any, TypeVar, get_args
 
-from .typing import Dataclass
+from .typing import Dataclass, get_origin, is_literal, is_union, type_repr
 
 DC = TypeVar("DC", bound=Dataclass)
+
+
+def structure_union(
+    conv: cattrs.Converter,
+    val: Any,  # noqa: ANN401
+    u: UnionType,
+) -> Any:  # noqa: ANN401
+    matches = []
+
+    for t in get_args(u):
+        origin = get_origin(t)
+        args = get_args(t)
+
+        if t is type(None):
+            if val is None:
+                matches.append((t, 2, val))
+        elif is_literal(t):
+            if val in args:
+                matches.append((t, 2, val))
+        else:
+            try:
+                if isinstance(val, origin):
+                    score = 1
+                else:
+                    score = 0
+
+                matches.append((t, score, conv.structure(val, t)))
+            except Exception:  # noqa: BLE001, S110
+                pass
+
+    if len(matches) >= 1:
+        best = max(score for _, score, _ in matches)
+        matches = [(t, struct) for t, score, struct in matches if score == best]
+        if len(matches) == 1:
+            return matches[0][1]
+        else:
+            raise TypeError(f"ambiguous value {val!r} for {type_repr(u)}")
+    else:
+        raise TypeError(f"incompatible value {val!r} for {type_repr(u)}")
 
 
 def from_dict(data_cls: type[DC], data: dict[str, Any]) -> DC:
@@ -33,15 +74,13 @@ def from_dict(data_cls: type[DC], data: dict[str, Any]) -> DC:
     Returns:
         A `data_cls` instance.
     """
-    return dacite.from_dict(
-        data_class=data_cls,
-        data=data,
-        config=dacite.Config(
-            cast=[tuple],
-            strict=True,
-            strict_unions_match=True,
-        ),
+    conv = cattrs.Converter(forbid_extra_keys=True)
+    conv.register_structure_hook_func(
+        is_union,
+        partial(structure_union, conv),
     )
+
+    return conv.structure(data, data_cls)
 
 
 def to_dict(data: Dataclass, *, recursive: bool = True) -> dict[str, Any]:

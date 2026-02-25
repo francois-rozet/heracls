@@ -16,47 +16,19 @@ from collections.abc import Callable
 from dataclasses import MISSING, dataclass, is_dataclass
 from functools import partial
 from numbers import Number
-from types import UnionType
 from typing import (
     Any,
-    Literal,
     TypeVar,
-    Union,
     get_args,
-    get_origin,
 )
 from unittest.mock import patch
 
 from .core import from_dict
-from .typing import Dataclass
+from .typing import Dataclass, get_origin, is_literal, is_union, type_repr
 
 T = TypeVar("T")
 DC = TypeVar("DC", bound=Dataclass)
 HELP = "<HELP>"
-
-
-def origin(t: T) -> T:
-    return t if get_origin(t) is None else get_origin(t)
-
-
-def type_repr(t: type) -> str:
-    args = get_args(t)
-
-    if t is Ellipsis:
-        return "..."
-    elif t is type(None):
-        return "None"
-    elif origin(t) == Literal:
-        return "{" + ",".join(map(repr, args)) + "}"
-    elif origin(t) == Union or isinstance(t, UnionType):
-        return "union[" + ", ".join(map(type_repr, args)) + "]"
-
-    r = getattr(origin(t), "__name__", repr(origin(t)))
-
-    if args:
-        return r + "[" + ", ".join(map(type_repr, args)) + "]"
-    else:
-        return r
 
 
 def boolean(s: str) -> bool:
@@ -64,11 +36,13 @@ def boolean(s: str) -> bool:
 
 
 def string_parser(t: type[T]) -> Callable[[str], T]:
-    if issubclass(origin(t), bool):
+    origin = get_origin(t)
+
+    if issubclass(origin, bool):
         return boolean
-    elif issubclass(origin(t), (str, Number)):
+    elif issubclass(origin, (str, Number)):
         parser = lambda s: t(s)
-    elif issubclass(origin(t), (dict, list, tuple)):
+    elif issubclass(origin, (dict, list, tuple)):
         parser = lambda s: json.loads(s)
     else:
         parser = lambda s: s
@@ -76,13 +50,6 @@ def string_parser(t: type[T]) -> Callable[[str], T]:
     parser.__name__ = type_repr(t)
 
     return parser
-
-
-@dataclass
-class DataclassSpec:
-    data_cls: type[Dataclass]
-    keys: set[str]
-    choices: dict[str, dict[str, type[Dataclass] | Callable[[], Any]]]
 
 
 def field(
@@ -126,7 +93,7 @@ class ChoiceAction(argparse.Action):
             setattr(namespace, self.dest, value())
 
 
-class SimpleHelpFormatter(
+class HelpFormatter(
     argparse.ArgumentDefaultsHelpFormatter,
     argparse.MetavarTypeHelpFormatter,
 ):
@@ -140,6 +107,13 @@ class SimpleHelpFormatter(
         return help
 
 
+@dataclass
+class DataclassSpec:
+    data_cls: type[Dataclass]
+    keys: set[str]
+    choices: dict[str, dict[str, type[Dataclass] | Callable[[], Any]]]
+
+
 class ArgumentParser(argparse.ArgumentParser):
     """Simple dataclass-aware argument parser."""
 
@@ -147,7 +121,7 @@ class ArgumentParser(argparse.ArgumentParser):
         kwargs.setdefault(
             "formatter_class",
             partial(
-                SimpleHelpFormatter,
+                HelpFormatter,
                 max_help_position=64,
                 width=96,
             ),
@@ -225,14 +199,13 @@ class ArgumentParser(argparse.ArgumentParser):
 
                 f_type = f.type
 
-                if origin(f_type) == Union or isinstance(f_type, UnionType):
-                    types = set(get_args(f_type)) - {type(None)}
-                    if len(types) == 1:
-                        f_type = types.pop()
+                if is_union(f_type):
+                    f_args = set(get_args(f_type)) - {type(None)}
+                    if len(f_args) == 1:
+                        f_type = f_args.pop()
 
-                if origin(f_type) == Literal:
-                    types = get_args(f_type)
-                    group.add_argument(f_flag, choices=types, **kwargs)
+                if is_literal(f_type):
+                    group.add_argument(f_flag, choices=get_args(f_type), **kwargs)
                 else:
                     group.add_argument(f_flag, type=string_parser(f_type), **kwargs)
 

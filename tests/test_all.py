@@ -1,5 +1,8 @@
 """Tests for the heracls module."""
 
+import pytest
+
+from cattrs.errors import ClassValidationError
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -75,6 +78,16 @@ def test_from_dotlist() -> None:
         optimizer=SGDConfig(nesterov=True),
         data_splits=(0.7, 0.2),
     )
+
+
+def test_from_dict_union_strict_match() -> None:
+    data = {
+        "output": "./out",
+        "optimizer": {"learning_rate": 0.1},
+    }
+
+    with pytest.raises(ClassValidationError):
+        heracls.from_dict(TrainConfig, data)
 
 
 def test_ArgumentParser() -> None:
