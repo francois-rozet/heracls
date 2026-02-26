@@ -14,14 +14,51 @@ import cattrs
 import dataclasses
 import yaml
 
+from collections.abc import Iterable, MutableSequence, Sequence
 from functools import partial
 from omegaconf import DictConfig, OmegaConf
 from types import UnionType
 from typing import Any, TypeVar, get_args
 
-from .typing import Dataclass, get_origin, is_dataclass_instance, is_literal, is_union, type_repr
+from .typing import (
+    Dataclass,
+    get_origin,
+    is_dataclass_instance,
+    is_literal,
+    is_sequence,
+    is_union,
+    type_repr,
+)
 
 DC = TypeVar("DC", bound=Dataclass)
+
+
+def structure_sequence(
+    conv: cattrs.Converter,
+    val: Iterable,
+    s: type[Sequence],
+) -> Sequence:
+    origin = get_origin(s)
+    args = get_args(s)
+
+    if issubclass(origin, (list, tuple)):
+        cast = origin
+    elif issubclass(origin, MutableSequence):
+        cast = type(val) if isinstance(val, list) else list
+    elif issubclass(origin, Sequence):
+        cast = type(val) if isinstance(val, (list, tuple)) else tuple
+    else:
+        cast = tuple
+
+    if args:
+        t = args[0]
+    else:
+        t = Any
+
+    if t in (Any, object):
+        return cast(val)
+    else:
+        return cast(conv.structure(item, t) for item in val)
 
 
 def structure_union(
@@ -60,9 +97,9 @@ def structure_union(
         if len(matches) == 1:
             return matches[0][1]
         else:
-            raise TypeError(f"ambiguous value {val!r} for {type_repr(u)}")
+            raise TypeError(f"Several type matches for value {val!r} in {type_repr(u)}")
     else:
-        raise TypeError(f"incompatible value {val!r} for {type_repr(u)}")
+        raise TypeError(f"Incompatible value {val!r} for {type_repr(u)}")
 
 
 def from_dict(data_cls: type[DC], data: dict[str, Any]) -> DC:
@@ -76,10 +113,8 @@ def from_dict(data_cls: type[DC], data: dict[str, Any]) -> DC:
         A `data_cls` instance.
     """
     conv = cattrs.Converter(forbid_extra_keys=True)
-    conv.register_structure_hook_func(
-        is_union,
-        partial(structure_union, conv),
-    )
+    conv.register_structure_hook_func(is_sequence, partial(structure_sequence, conv))
+    conv.register_structure_hook_func(is_union, partial(structure_union, conv))
 
     return conv.structure(data, data_cls)
 

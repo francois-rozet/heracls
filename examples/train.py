@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -41,7 +42,7 @@ class TrainConfig:
     data_splits: tuple[float, ...] = (0.8, 0.1)
     n_epochs: int = 1024
     n_steps_per_epoch: int = 256
-    tasks: list[str] = field(default_factory=list)
+    tasks: Sequence[str] = field(default_factory=tuple)
 
 
 def main() -> None:

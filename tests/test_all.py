@@ -3,6 +3,7 @@
 import pytest
 
 from cattrs.errors import ClassValidationError
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -47,8 +48,8 @@ class TrainConfig:
     data_splits: tuple[float, ...] = (0.8, 0.1)
     n_epochs: int = 1024
     n_steps_per_epoch: int = 256
-    tasks: list[str] = field(default_factory=list)
-    magic: dict[str, float] = field(default_factory=dict)
+    tasks: Sequence[str] = field(default_factory=list)
+    magic: Mapping[str, float] = field(default_factory=dict)
 
 
 def test_from_dict() -> None:

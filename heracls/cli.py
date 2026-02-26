@@ -12,7 +12,7 @@ import copy
 import dataclasses
 import json
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import MISSING, dataclass
 from functools import partial
 from numbers import Number
@@ -42,7 +42,7 @@ def string_parser(t: type[T]) -> Callable[[str], T]:
         return boolean
     elif issubclass(origin, (str, Number)):
         parser = lambda s: t(s)
-    elif issubclass(origin, (dict, list, tuple)):
+    elif issubclass(origin, (Mapping, Sequence)):
         parser = lambda s: json.loads(s)
     else:
         parser = lambda s: s

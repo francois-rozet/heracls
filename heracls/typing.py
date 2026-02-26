@@ -1,5 +1,6 @@
 """Types and protocols."""
 
+from collections.abc import Sequence
 from dataclasses import is_dataclass
 from types import UnionType
 from typing import Any, ClassVar, Literal, Protocol, Union, get_args
@@ -25,6 +26,10 @@ def is_dataclass_type(x: Any) -> bool:  # noqa: ANN401
 
 def is_literal(t: type) -> bool:
     return get_origin(t) is Literal
+
+
+def is_sequence(t: type) -> bool:
+    return issubclass(get_origin(t), Sequence)
 
 
 def is_union(t: type) -> bool:

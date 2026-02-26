@@ -112,7 +112,7 @@ $ python examples/train.py --help
 usage: train.py [-h] [--dry] --output str [--model.name str] [--model.depth int]
                 [--model.width int] [--model.dropout float] [--optimizer {adam,sgd}]
                 [--dataset str] [--data_splits tuple[float, ...]] [--n_epochs int]
-                [--n_steps_per_epoch int] [--tasks list[str]] [--optimizer.name {adam}]
+                [--n_steps_per_epoch int] [--tasks Sequence[str]] [--optimizer.name {adam}]
                 [--optimizer.betas tuple[float, float]] [--optimizer.learning_rate float]
                 [--optimizer.weight_decay float]
 
@@ -126,7 +126,7 @@ options:
   --data_splits tuple[float, ...]        (default: (0.8, 0.1))
   --n_epochs int                         (default: 1024)
   --n_steps_per_epoch int                (default: 256)
-  --tasks list[str]                      (default: [])
+  --tasks Sequence[str]                  (default: ())
 
 model:
   --model.name str                       (default: mlp)
